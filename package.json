@@ -1,0 +1,22 @@
+{
+  "name": "autosuggest.js",
+  "version": "0.1.0",
+  "description": "JavaScript library for suggesting and completing text",
+  "homepage": "https://github.com/thegecko/autosuggest.js",
+  "author": "Rob Moran <rob@thegecko.org>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/thegecko/autosuggest.js.git"
+  },
+  "devDependencies": {
+    "bower": "^1.3.9",
+    "browser-sync": "^1.3.5",
+    "gulp": "^3.8.7",
+    "gulp-util": "^3.0.0"
+  },
+  "scripts": {
+    "kill": "killall gulp || exit 0",
+    "debug": "npm run kill && gulp"
+  }
+}

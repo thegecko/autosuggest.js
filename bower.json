@@ -1,0 +1,10 @@
+{
+  "name": "autosuggest.js",
+  "version": "0.0.1",
+  "description": "JavaScript library for suggesting and completing text",
+  "homepage": "https://github.com/thegecko/autosuggest.js",
+  "authors": [
+    "Rob Moran <rob@thegecko.org>"
+  ],
+  "license": "MIT"
+}
