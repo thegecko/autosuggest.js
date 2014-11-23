@@ -1,27 +1,30 @@
-// AutoSuggest.js
-// Version: 0.0.1
-
-// The MIT License (MIT)
-// 
-// Copyright (c) 2014 Rob Moran
-// 
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-// 
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-// 
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
+/* @license
+ *
+ * AutoSuggest.js
+ * Version: 0.0.2
+ *
+ * The MIT License (MIT)
+ *
+ * Copyright (c) 2014 Rob Moran
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 
 (function(global, factory) {
 
@@ -81,10 +84,11 @@
     }
 
     // Main object
-    var AutoSuggest = function(element, template, callback, opts) {
+    var AutoSuggest = function(element, template, callback) {
         // Default options
         var options = this.options = {
             delimiter: " ",
+            firstDelimiter: false,
             watermark: "enter something...",
             multipleMarker: "*",
             valueFormat: "{0}{1}",
@@ -92,20 +96,20 @@
         };
 
         // Merge options
-        if (opts) {
-            for (var item in opts) {
-                if (options[item]) {
-                    options[item] = opts[item];
-                }
+        for (var item in template) {
+            if (options[item] !== undefined) {
+                options[item] = template[item];
             }
         }
 
         this.template = this.currentItem = template;
+        this.references = template.references;
         this.callback = callback;
         this.dropdownIndex = 0;
         this.remainingText = "";
         this.suggestItems = {};
         this.freeTextItem = null;
+        this.nodeList = [];
 
         var input = this.input = buildElement("input", "input", { position: "absolute", backgroundColor: "transparent" });
         input.addEventListener("focus", this.onFocus.bind(this));
@@ -206,13 +210,18 @@
     };
 
     // Recurse through template to find final match
-    AutoSuggest.prototype.parseTemplate = function(remainingText, currentItem, multipleParent, ignoreList) {
+    AutoSuggest.prototype.parseTemplate = function(remainingText, currentItem, nodeList, multipleParent, ignoreList) {
+        nodeList = nodeList || [];
         ignoreList = ignoreList || [];
         currentItem = currentItem || this.template;
 
+        if (currentItem.reference) {
+            currentItem = this.references[currentItem.reference];
+        }
+
         var freeTextItem = (currentItem.items && currentItem.items[this.options.multipleMarker]);
         var isMultiple = (multipleParent && (freeTextItem || !currentItem.items));
-        var items = [];
+        var items = {};
 
         if (!currentItem.items && multipleParent) {
             currentItem = multipleParent;
@@ -233,10 +242,21 @@
             if (isMultiple && (ignoreList.indexOf(name) > -1 || !item.allowOthers)) continue;
 
             // Determine prefix
-            var delimiter = (isMultiple && item.multiDelimiter) ? item.multiDelimiter : item.delimiter || this.options.delimiter;
+            var delimiter = this.options.delimiter;
+            if (nodeList.length === 0 && !this.options.firstDelimiter) {
+                delimiter = "";
+            } else if (isMultiple && item.multiDelimiter !== undefined) delimiter = item.multiDelimiter;
+            else if (item.delimiter !== undefined) delimiter = item.delimiter;
 
             // Determine suffix for freeText items
-            var suffix = (item.items && item.items[this.options.multipleMarker]) ? item.items[this.options.multipleMarker].delimiter || this.options.delimiter : "";
+            var suffix = "";
+            if (item.items && item.items[this.options.multipleMarker]) {
+                if (item.items[this.options.multipleMarker].delimiter != undefined) {
+                    suffix = item.items[this.options.multipleMarker].delimiter;
+                } else {
+                    suffix = this.options.delimiter;
+                }
+            }
 
             // Format value
             suggestItems[name] = format(this.options.valueFormat, delimiter, name + suffix, item.description);
@@ -293,7 +313,10 @@
                     multipleParent = multipleParent || currentItem;
                 }
 
-                return this.parseTemplate(remainingText.substring(length), currentItem.items[matchName], multipleParent, ignoreList);
+                var node = (matchName === this.options.multipleMarker) ? remainingText.substring(0, length) : matchName;
+                nodeList.push(node);
+
+                return this.parseTemplate(remainingText.substring(length), currentItem.items[matchName], nodeList, multipleParent, ignoreList);
             }
         }
 
@@ -301,6 +324,7 @@
         this.remainingText = remainingText;
         this.suggestItems = suggestItems;
         this.freeTextItem = freeTextItem;
+        this.nodeList = nodeList;
     };
 
     AutoSuggest.prototype.render = function() {
@@ -361,7 +385,7 @@
 
     AutoSuggest.prototype.onInput = function() {
         this.render();
-        this.callback(this.input.value, this.currentItem);
+        this.callback(this.input.value, this.nodeList, this.currentItem);
     };
 
     AutoSuggest.prototype.setValue = function(value) {
