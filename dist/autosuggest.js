@@ -1,7 +1,7 @@
 /* @license
  *
  * AutoSuggest.js
- * Version: 0.0.2
+ * Version: 0.0.3
  *
  * The MIT License (MIT)
  *
@@ -25,7 +25,6 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-
 (function(global, factory) {
 
     if (typeof exports === 'object') {
@@ -62,7 +61,6 @@
         var text = args.shift();
 
         return text.replace(regex, function(m, k) {
-
             var formatter = k.split(separator);
             var key = formatter.shift();
 
@@ -87,12 +85,13 @@
     var AutoSuggest = function(element, template, callback) {
         // Default options
         var options = this.options = {
+            watermark: "enter text...",
             delimiter: " ",
             firstDelimiter: false,
-            watermark: "enter something...",
-            multipleMarker: "*",
             valueFormat: "{0}{1}",
-            descriptionFormat: "{0} ({1})"
+            descriptionFormat: "{0} ({1})",
+            freeTextMarker: "*",
+            referenceMarker: "$ref"
         };
 
         // Merge options
@@ -102,14 +101,12 @@
             }
         }
 
-        this.template = this.currentItem = template;
+        this.template = template;
         this.references = template.references;
         this.callback = callback;
         this.dropdownIndex = 0;
-        this.remainingText = "";
-        this.suggestItems = {};
         this.freeTextItem = null;
-        this.nodeList = [];
+        this.state = {};
 
         var input = this.input = buildElement("input", "input", { position: "absolute", backgroundColor: "transparent" });
         input.addEventListener("focus", this.onFocus.bind(this));
@@ -120,15 +117,182 @@
         var hint = this.hint = buildElement("input", "input hint");
         hint.value = options.watermark;
 
-        var container = this.container = buildElement("div", "suggest");
+        var container = this.container = buildElement("span", "suggest", { position: "relative" });
         var dropdown = this.dropdown = buildElement("div", "dropdown", { position: "absolute", display: "none" });
         var ruler = this.ruler = buildElement("span", "input ruler", { position: "fixed", display: "inline", visibility: "hidden", top: 0, right: 0, width: "auto" });
+        var loader = this.loader = buildElement("div", "loader", { position: "absolute", right: "0", visibility: "hidden" });
 
         container.appendChild(ruler);
+        container.appendChild(loader);
         container.appendChild(input);
         container.appendChild(hint);
         container.appendChild(dropdown);
         element.appendChild(container);
+    };
+
+    // Mixin item with any referenced counterpart
+    AutoSuggest.prototype.resolveReference = function(item) {
+        if (item[this.options.referenceMarker]) {
+            var referenceName = item[this.options.referenceMarker];
+            var reference = this.references[referenceName];
+            for (var name in reference) {
+                if (item[name] === undefined) {
+                    item[name] = reference[name];
+                }
+            }
+        }
+    };
+
+    // Recurse through template to find final match
+    AutoSuggest.prototype.parseTemplate = function(remainingText, currentItem, nodeList, multipleParent, ignoreList) {
+        currentItem = currentItem || this.template;
+        nodeList = nodeList || [];
+        ignoreList = ignoreList || [];
+
+        // Resolve any reference
+        this.resolveReference(currentItem);
+
+        // Show loader
+        this.loader.style.visibility = "visible";
+
+        // Execute user-defined function for building items
+        var itemFn = currentItem.itemFn || function(state, callback) { callback(); };
+        itemFn({
+            "text": this.input.value.substring(remainingText.length),
+            "item": currentItem,
+            "list": nodeList
+        }, function() {
+
+            // hide loader
+            this.loader.style.visibility = "hidden";
+
+            // Determine if we have free text or multiple
+            var freeTextItem = (currentItem.items && currentItem.items[this.options.freeTextMarker]);
+            var isMultiple = (multipleParent && (freeTextItem || !currentItem.items));
+
+            // Determine items to deal with
+            var items = {};
+            if (freeTextItem && multipleParent) {
+                items = multipleParent.items;
+            } else if (!freeTextItem) {
+                items = currentItem.items || (multipleParent && multipleParent.items) || {};
+            }
+
+            // Build dictionary of values
+            var suggestItems = {}
+            for (var name in items) {
+                var item = items[name];
+
+                // Resolve any reference
+                this.resolveReference(item);
+
+                // If we have a current multipleParent, ignore others that don't play well
+                if (isMultiple && (ignoreList.indexOf(name) > -1 || !item.allowOthers)) continue;
+
+                // Determine prefix
+                var delimiter = this.options.delimiter;
+                if (nodeList.length === 0 && !this.options.firstDelimiter) {
+                    delimiter = "";
+                } else if (isMultiple && item.multiDelimiter !== undefined) {
+                    delimiter = item.multiDelimiter;
+                } else if (item.delimiter !== undefined) {
+                    delimiter = item.delimiter;
+                }
+
+                // Determine suffix for freeText items
+                var suffix = "";
+                if (item.items && item.items[this.options.freeTextMarker]) {
+                    var suffixItem = item.items[this.options.freeTextMarker];
+                    suffix = suffixItem.delimiter || this.options.delimiter;
+                }
+
+                // Format value
+                suggestItems[name] = format(this.options.valueFormat, delimiter, name + suffix, item.description);
+            }
+
+            // Match next
+            if (suggestItems !== {} && remainingText !== "") {
+                var matchName = null;
+                var length = -1;
+
+                if (freeTextItem) {
+                    // It could be anything, let's find the next match in there
+                    matchName = this.options.freeTextMarker;
+                    length = remainingText.length;
+
+                    // Find the longest exact match starting from the end
+                    for (var name in suggestItems) {
+                        var value = suggestItems[name];
+                        var index = remainingText.indexOf(value);
+                        if (index > -1 && index < length) {
+                            length = index;
+                        }
+                    }
+
+                    // If length is unchanged, find longest partial match from the end
+                    if (length === remainingText.length) {
+                        for (var name in suggestItems) {
+                            var value = suggestItems[name];
+                            for (var i = 1; i <= value.length; i++) {
+                                var partial = value.substring(0, i);
+                                var index = remainingText.length - i;
+                                if (remainingText.substring(index) === partial && index < length){
+                                    length = index;
+                                }
+                            }
+                        }
+                    }
+                } else {
+
+                    // Find the longest exact match
+                    for (var name in suggestItems) {
+                        var value = suggestItems[name];
+                        if (remainingText.indexOf(value) === 0 && value.length > length) {
+                            // We have found a matching item longer than before
+                            matchName = name;
+                            length = value.length;
+                        }
+                    }
+                }
+
+                if (matchName) {
+                    // Set up for multiple items
+                    if (!currentItem.items && multipleParent) {
+                        currentItem = multipleParent;
+                    }
+                    if (currentItem.items[matchName].allowOthers) {
+                        ignoreList.push(matchName);
+                        multipleParent = multipleParent || currentItem;
+                    }
+
+                    var node = (matchName === this.options.freeTextMarker) ? remainingText.substring(0, length) : matchName;
+                    nodeList.push(node);
+
+                    return this.parseTemplate(remainingText.substring(length), currentItem.items[matchName], nodeList, multipleParent, ignoreList);
+                }
+            }
+
+            // Build current state
+            var descriptions = {};
+            for (var name in suggestItems) {
+                var value = suggestItems[name];
+                var item = items[name];
+                var description = item.description ? format(this.options.descriptionFormat, value, item.description) : value;
+                descriptions[name] = description;
+            }       
+
+            this.freeTextItem = freeTextItem;
+            this.state = {
+                "remainingText": remainingText,
+                "template": currentItem,
+                "list": nodeList,
+                "items": suggestItems,
+                "descriptions": descriptions
+            };
+
+            // Finished, trigger other stuff
+            this.onParse();
+        }.bind(this));
     };
 
     AutoSuggest.prototype.textWidth = function(text) {
@@ -136,7 +300,7 @@
         return this.ruler.offsetWidth;
     };
 
-    AutoSuggest.prototype.buildDropdown = function(items) {
+    AutoSuggest.prototype.buildDropdown = function(state) {
         this.dropdown.style.display = "none";
         this.dropdownIndex = 0;
 
@@ -146,31 +310,27 @@
 
         function onDown(value) {
             return function() {
-                this.setValue(this.input.value + value.substring(this.remainingText.length));
+                this.setValue(this.input.value + value.substring(state.remainingText.length));
                 setTimeout(function() { this.input.focus(); }.bind(this), 0);
             }
         }
 
-        if (typeof(items) === "object") {
-            for (var name in items) {
-                var value = items[name];
+        if (state) {
+            for (var name in state.items) {
+                var value = state.items[name];
                 // Ignore items not beginning with current text
-                if (this.remainingText && value.indexOf(this.remainingText) !== 0) continue;
-                var item = this.currentItem.items[name];
-                if (!item) continue;
+                if (state.remainingText && value.indexOf(state.remainingText) !== 0) continue;               
                 var option = buildElement("div", "dropdownOption");
-                if (item.items && item.items["*"] && item.items["*"].placeHolder) {
-                    value += item.items["*"].placeHolder;
-                }
-                option.innerText = item.description ? format(this.options.descriptionFormat, value, item.description) : value;
+                option.innerText = state.descriptions[name];
                 option.addEventListener("mousedown", onDown(value).bind(this));
                 this.dropdown.appendChild(option);
             }
 
             if (this.dropdown.children) {
-                var validText = this.input.value.substring(0, this.input.value.length - this.remainingText.length);
-                this.dropdown.style.marginLeft = format("{0}px", this.textWidth(validText));
                 this.dropdown.style.display = "block";
+                var validText = this.input.value.substring(0, this.input.value.length - state.remainingText.length);
+                var offset = Math.min(this.textWidth(validText), this.input.clientWidth - this.dropdown.clientWidth);
+                this.dropdown.style.marginLeft = format("{0}px", offset);
             }
         }
     };
@@ -189,162 +349,31 @@
         }
     };
 
-    AutoSuggest.prototype.renderHint = function() {
+    AutoSuggest.prototype.renderHint = function(state) {
+        // Hide hint when we scroll text off the end
+        if (this.input.scrollWidth > this.input.clientWidth) {
+            this.hint.value = "";
+            return;
+        }
+
+        // Freetext items can have a placeholder when nothing entered
         if (this.freeTextItem && this.freeTextItem.placeHolder) {
             this.hint.value = this.input.value + this.freeTextItem.placeHolder;
             return;
         }
 
         var index = 0;
-        for (var name in this.suggestItems) {
-            var value = this.suggestItems[name];
-            if (value.indexOf(this.remainingText) === 0 ) {
+        for (var name in state.items) {
+            var value = state.items[name];
+            if (value.indexOf(state.remainingText) === 0 ) {
                 if (index == this.dropdownIndex) {
-                    this.hint.value = this.input.value + value.substring(this.remainingText.length);
+                    this.hint.value = this.input.value + value.substring(state.remainingText.length);
                     break;                    
                 } else {
                     index ++;
                 }
             }
         }
-    };
-
-    // Recurse through template to find final match
-    AutoSuggest.prototype.parseTemplate = function(remainingText, currentItem, nodeList, multipleParent, ignoreList) {
-        nodeList = nodeList || [];
-        ignoreList = ignoreList || [];
-        currentItem = currentItem || this.template;
-
-        if (currentItem.reference) {
-            currentItem = this.references[currentItem.reference];
-        }
-
-        var freeTextItem = (currentItem.items && currentItem.items[this.options.multipleMarker]);
-        var isMultiple = (multipleParent && (freeTextItem || !currentItem.items));
-        var items = {};
-
-        if (!currentItem.items && multipleParent) {
-            currentItem = multipleParent;
-        }
-
-        if (freeTextItem && multipleParent) {
-            items = multipleParent.items;
-        } else if (!freeTextItem) {
-            items = currentItem.items;
-        }
-
-        // Build dictionary of values
-        var suggestItems = {}
-        for (var name in items) {
-            var item = items[name];
-
-            // If we have a current multipleParent, ignore others that don't play well
-            if (isMultiple && (ignoreList.indexOf(name) > -1 || !item.allowOthers)) continue;
-
-            // Determine prefix
-            var delimiter = this.options.delimiter;
-            if (nodeList.length === 0 && !this.options.firstDelimiter) {
-                delimiter = "";
-            } else if (isMultiple && item.multiDelimiter !== undefined) delimiter = item.multiDelimiter;
-            else if (item.delimiter !== undefined) delimiter = item.delimiter;
-
-            // Determine suffix for freeText items
-            var suffix = "";
-            if (item.items && item.items[this.options.multipleMarker]) {
-                if (item.items[this.options.multipleMarker].delimiter != undefined) {
-                    suffix = item.items[this.options.multipleMarker].delimiter;
-                } else {
-                    suffix = this.options.delimiter;
-                }
-            }
-
-            // Format value
-            suggestItems[name] = format(this.options.valueFormat, delimiter, name + suffix, item.description);
-        }
-
-        // Match next
-        if (suggestItems !== {} && remainingText !== "") {
-            var matchName = null;
-            var length = -1;
-
-            if (freeTextItem) {
-                // It could be anything, let's find the next match in there
-                matchName = this.options.multipleMarker;
-                length = remainingText.length;
-
-                // Find the longest exact match starting from the end
-                for (var name in suggestItems) {
-                    var value = suggestItems[name];
-                    var index = remainingText.indexOf(value);
-                    if (index > -1 && index < length) {
-                        length = index;
-                    }
-                }
-
-                // If length is unchanged, find longest partial match from the end
-                if (length === remainingText.length) {
-                    for (var name in suggestItems) {
-                        var value = suggestItems[name];
-                        for (var i = 1; i <= value.length; i++) {
-                            var partial = value.substring(0, i);
-                            var index = remainingText.length - i;
-                            if (remainingText.substring(index) === partial && index < length){
-                                length = index;
-                            }
-                        }
-                    }
-                }
-            } else {
-                // Find the longest exact match
-                for (var name in suggestItems) {
-                    var value = suggestItems[name];
-                    if (remainingText.indexOf(value) === 0 && value.length > length) {
-                        // We have found a matching item longer than before
-                        matchName = name;
-                        length = value.length;
-                    }
-                }
-            }
-
-            if (matchName) {
-                // Set up for multiple items
-                if (currentItem.items[matchName].allowOthers) {
-                    ignoreList.push(matchName);
-                    multipleParent = multipleParent || currentItem;
-                }
-
-                var node = (matchName === this.options.multipleMarker) ? remainingText.substring(0, length) : matchName;
-                nodeList.push(node);
-
-                return this.parseTemplate(remainingText.substring(length), currentItem.items[matchName], nodeList, multipleParent, ignoreList);
-            }
-        }
-
-        this.currentItem = currentItem;
-        this.remainingText = remainingText;
-        this.suggestItems = suggestItems;
-        this.freeTextItem = freeTextItem;
-        this.nodeList = nodeList;
-    };
-
-    AutoSuggest.prototype.render = function() {
-        this.hint.value = "";
-        this.parseTemplate(this.input.value);
-
-        if (this.input === document.activeElement) {
-            this.buildDropdown(this.suggestItems);
-            this.renderDropdown();
-            this.renderHint();
-        }
-    };
-
-    AutoSuggest.prototype.onFocus = function() {
-        this.render();
-    };
-
-    AutoSuggest.prototype.onBlur = function() {
-        this.buildDropdown(null);
-        this.hint.value = (this.input.value === "") ? this.options.watermark : this.input.value;
     };
 
     AutoSuggest.prototype.onKeydown = function(e) {
@@ -355,6 +384,7 @@
             case 9:         // Tab
             case 13:        // Return
             case 39: {      // Right
+
                 // Autocomplete the selected suggestion
                 if (this.input.selectionStart == this.input.value.length && this.input.selectionStart < this.hint.value.length) {
                     this.setValue(this.hint.value);
@@ -365,17 +395,16 @@
                     e.preventDefault();
                     e.stopPropagation();
                 }
-
                 break;
             }
             case 27: {      // Escape
-                this.buildDropdown(null);
+                this.buildDropdown();
                 break;
             }
             case 38:        // Up
             case 40: {      // Down
                 this.renderDropdown(keyCode == 38 ? -1 : 1);
-                this.renderHint();
+                this.renderHint(this.state);
                 e.preventDefault();
                 e.stopPropagation();
                 break;
@@ -383,14 +412,38 @@
         }
     };
 
-    AutoSuggest.prototype.onInput = function() {
+    AutoSuggest.prototype.render = function() {
+        this.hint.value = "";
+        this.dropdownIndex = 0;
+        this.parseTemplate(this.input.value);
+    };
+
+    AutoSuggest.prototype.onFocus = function() {
         this.render();
-        this.callback(this.input.value, this.nodeList, this.currentItem);
+    };
+
+    AutoSuggest.prototype.onBlur = function() {
+        this.buildDropdown();
+        this.hint.value = (this.input.value === "") ? this.options.watermark : "";
     };
 
     AutoSuggest.prototype.setValue = function(value) {
         this.input.value = value;
         this.onInput();
+    };
+
+    AutoSuggest.prototype.onInput = function() {
+        this.render();
+    };
+
+    AutoSuggest.prototype.onParse = function() {
+        if (this.input === document.activeElement) {
+            this.buildDropdown(this.state);
+            this.renderDropdown();
+            this.renderHint(this.state);
+        }
+
+        this.callback(this.input.value, this.state);
     };
 
     return AutoSuggest;
