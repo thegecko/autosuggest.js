@@ -1,7 +1,7 @@
 /* @license
  *
  * AutoSuggest.js
- * Version: 0.0.3
+ * Version: 0.0.6
  *
  * The MIT License (MIT)
  *
@@ -91,7 +91,15 @@
             valueFormat: "{0}{1}",
             descriptionFormat: "{0} ({1})",
             freeTextMarker: "*",
-            referenceMarker: "$ref"
+            referenceMarker: "$ref",
+            inputClass: "input",
+            hintClass: "input hint",
+            containerClass: "suggest",
+            dropdownClass: "dropdown",
+            dropdownOptionClass: "dropdownOption",
+            dropdownSelectClass: "dropdownOption select",
+            rulerClass: "input ruler",
+            loaderClass: "loader"
         };
 
         // Merge options
@@ -108,23 +116,25 @@
         this.freeTextItem = null;
         this.state = {};
 
-        var input = this.input = buildElement("input", "input", { position: "absolute", backgroundColor: "transparent" });
+        var input = this.input = buildElement("input", options.inputClass, { position: "absolute", backgroundColor: "transparent" });
+        input.type = "text";
         input.addEventListener("focus", this.onFocus.bind(this));
         input.addEventListener("blur", this.onBlur.bind(this));
         input.addEventListener("keydown", this.onKeydown.bind(this));
         input.addEventListener("input", this.onInput.bind(this));
 
-        var hint = this.hint = buildElement("input", "input hint");
+        var hint = this.hint = buildElement("input", options.hintClass, { display: "inline-block" });
+        hint.type = "text";
         hint.value = options.watermark;
 
-        var container = this.container = buildElement("span", "suggest", { position: "relative" });
-        var dropdown = this.dropdown = buildElement("div", "dropdown", { position: "absolute", display: "none" });
-        var ruler = this.ruler = buildElement("span", "input ruler", { position: "fixed", display: "inline", visibility: "hidden", top: 0, right: 0, width: "auto" });
-        var loader = this.loader = buildElement("div", "loader", { position: "absolute", right: "0", visibility: "hidden" });
+        var container = this.container = buildElement("span", options.containerClass, { position: "relative" });
+        var dropdown = this.dropdown = buildElement("ul", options.dropdownClass, { position: "absolute", zIndex: 1000, display: "none" });
+        var ruler = this.ruler = buildElement("span", options.rulerClass, { position: "fixed", display: "inline", visibility: "hidden", top: 0, right: 0, width: "auto" });
+        var loader = this.loader = buildElement("div", options.loaderClass, { position: "absolute", right: "0", visibility: "visible" });
 
         container.appendChild(ruler);
-        container.appendChild(loader);
         container.appendChild(input);
+        container.appendChild(loader);
         container.appendChild(hint);
         container.appendChild(dropdown);
         element.appendChild(container);
@@ -320,7 +330,7 @@
                 var value = state.items[name];
                 // Ignore items not beginning with current text
                 if (state.remainingText && value.indexOf(state.remainingText) !== 0) continue;               
-                var option = buildElement("div", "dropdownOption");
+                var option = buildElement("li", this.options.dropdownOptionClass);
                 option.innerText = state.descriptions[name];
                 option.addEventListener("mousedown", onDown(value).bind(this));
                 this.dropdown.appendChild(option);
@@ -344,7 +354,7 @@
             if (this.dropdownIndex < 0) this.dropdownIndex = this.dropdown.children.length - 1;
 
             for (var i = 0; i < this.dropdown.children.length; i++) {
-                this.dropdown.children[i].className = (i == this.dropdownIndex) ? "dropdownOption select" : "dropdownOption";
+                this.dropdown.children[i].className = (i == this.dropdownIndex) ? this.options.dropdownSelectClass : this.options.dropdownOptionClass;
             }
         }
     };
