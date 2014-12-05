@@ -1,6 +1,6 @@
 {
   "name": "autosuggest.js",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "JavaScript library for suggesting and completing text",
   "license": "MIT",
   "authors": "Rob Moran <rob@thegecko.org>",

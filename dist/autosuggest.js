@@ -1,7 +1,7 @@
 /* @license
  *
  * AutoSuggest.js
- * Version: 0.0.6
+ * Version: 0.0.7
  *
  * The MIT License (MIT)
  *
@@ -86,6 +86,7 @@
         // Default options
         var options = this.options = {
             watermark: "enter text...",
+            prefill: false,
             delimiter: " ",
             firstDelimiter: false,
             valueFormat: "{0}{1}",
@@ -125,12 +126,18 @@
 
         var hint = this.hint = buildElement("input", options.hintClass, { display: "inline-block" });
         hint.type = "text";
-        hint.value = options.watermark;
 
         var container = this.container = buildElement("span", options.containerClass, { position: "relative" });
-        var dropdown = this.dropdown = buildElement("ul", options.dropdownClass, { position: "absolute", zIndex: 1000, display: "none" });
+        var dropdown = this.dropdown = buildElement("div", options.dropdownClass, { position: "absolute", zIndex: 1000, display: "none" });
         var ruler = this.ruler = buildElement("span", options.rulerClass, { position: "fixed", display: "inline", visibility: "hidden", top: 0, right: 0, width: "auto" });
-        var loader = this.loader = buildElement("div", options.loaderClass, { position: "absolute", right: "0", visibility: "visible" });
+        var loader = this.loader = buildElement("div", options.loaderClass, { position: "absolute", right: "0", visibility: "hidden" });
+
+        if (options.prefill) {
+            for (var name in template.items) break;
+            input.value = this.itemValue(template.items[name], name);
+        } else {
+            hint.value = options.watermark;
+        }
 
         container.appendChild(ruler);
         container.appendChild(input);
@@ -138,6 +145,19 @@
         container.appendChild(hint);
         container.appendChild(dropdown);
         element.appendChild(container);
+    };
+
+    // Determine the value of an item
+    AutoSuggest.prototype.itemValue = function(item, name) {
+        var value = item.value || name;
+
+        // Determine suffix for freeText items
+        if (item.items && item.items[this.options.freeTextMarker]) {
+            var suffixItem = item.items[this.options.freeTextMarker];
+            value += suffixItem.delimiter || this.options.delimiter;
+        }
+
+        return value;
     };
 
     // Mixin item with any referenced counterpart
@@ -199,7 +219,7 @@
                 // If we have a current multipleParent, ignore others that don't play well
                 if (isMultiple && (ignoreList.indexOf(name) > -1 || !item.allowOthers)) continue;
 
-                // Determine prefix
+                // Determine delimiter
                 var delimiter = this.options.delimiter;
                 if (nodeList.length === 0 && !this.options.firstDelimiter) {
                     delimiter = "";
@@ -209,15 +229,8 @@
                     delimiter = item.delimiter;
                 }
 
-                // Determine suffix for freeText items
-                var suffix = "";
-                if (item.items && item.items[this.options.freeTextMarker]) {
-                    var suffixItem = item.items[this.options.freeTextMarker];
-                    suffix = suffixItem.delimiter || this.options.delimiter;
-                }
-
                 // Format value
-                suggestItems[name] = format(this.options.valueFormat, delimiter, name + suffix, item.description);
+                suggestItems[name] = format(this.options.valueFormat, delimiter, this.itemValue(item, name), item.description);
             }
 
             // Match next
@@ -330,7 +343,7 @@
                 var value = state.items[name];
                 // Ignore items not beginning with current text
                 if (state.remainingText && value.indexOf(state.remainingText) !== 0) continue;               
-                var option = buildElement("li", this.options.dropdownOptionClass);
+                var option = buildElement("div", this.options.dropdownOptionClass);
                 option.innerText = state.descriptions[name];
                 option.addEventListener("mousedown", onDown(value).bind(this));
                 this.dropdown.appendChild(option);
