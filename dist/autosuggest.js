@@ -1,7 +1,7 @@
 /* @license
  *
  * AutoSuggest.js
- * Version: 0.0.8
+ * Version: 0.0.9
  *
  * The MIT License (MIT)
  *
@@ -116,6 +116,8 @@
         this.dropdownIndex = 0;
         this.freeTextItem = null;
         this.state = {};
+        this.cachedPaths = [];
+        this.ddClicked = false;
 
         var input = this.input = buildElement("input", options.inputClass, { position: "absolute", display: "block", backgroundColor: "transparent", width: "100%" });
         input.type = "text";
@@ -126,7 +128,6 @@
 
         var hint = this.hint = buildElement("input", options.hintClass, { display: "block", width: "100%" });
         hint.type = "text";
-        hint.disabled = true;
 
         var container = this.container = buildElement("div", options.containerClass, { position: "relative" });
         var dropdown = this.dropdown = buildElement("div", options.dropdownClass, { position: "absolute", zIndex: 1000, display: "none" });
@@ -189,7 +190,13 @@
         this.loader.style.visibility = "visible";
 
         // Execute user-defined function for building items
-        var itemFn = currentItem.itemFn || function(state, callback) { callback(); };
+        var itemFn = function(state, callback) { callback(); };
+        var path = nodeList.join();
+        if (currentItem.itemFn && this.cachedPaths.indexOf(path) < 0) {
+            itemFn = currentItem.itemFn;
+            this.cachedPaths.push(path);
+        }
+
         itemFn({
             "text": this.input.value.substring(remainingText.length),
             "item": currentItem,
@@ -336,6 +343,7 @@
 
         function onDown(value) {
             return function() {
+                this.ddClicked = true;
                 this.setValue(this.input.value + value.substring(state.remainingText.length));
                 setTimeout(function() { this.input.focus(); }.bind(this), 0);
             }
@@ -443,7 +451,12 @@
 
     AutoSuggest.prototype.onBlur = function() {
         this.buildDropdown();
-        this.hint.value = (this.input.value === "") ? this.options.watermark : "";
+        if (this.ddClicked) {
+            this.ddClicked = false;
+        } else {
+            this.hint.value = (this.input.value === "") ? this.options.watermark : "";
+            this.cachedPaths = [];
+        }
     };
 
     AutoSuggest.prototype.onParse = function() {
