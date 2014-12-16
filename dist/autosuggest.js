@@ -1,7 +1,7 @@
 /* @license
  *
  * AutoSuggest.js
- * Version: 0.0.10
+ * Version: 0.0.11
  *
  * The MIT License (MIT)
  *
@@ -93,6 +93,7 @@
             descriptionFormat: "{0} ({1})",
             freeTextMarker: "*",
             referenceMarker: "$ref",
+            parseOnFocus: false,
             inputClass: "input",
             hintClass: "input hint",
             containerClass: "suggest",
@@ -445,7 +446,11 @@
     };
 
     AutoSuggest.prototype.onFocus = function() {
-        this.render();
+        if (this.options.parseOnFocus) {
+            this.onInput();
+        } else {
+            this.render();
+        }
     };
 
     AutoSuggest.prototype.onBlur = function() {
