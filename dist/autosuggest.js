@@ -1,7 +1,7 @@
 /* @license
  *
  * AutoSuggest.js
- * Version: 0.0.9
+ * Version: 0.0.10
  *
  * The MIT License (MIT)
  *
@@ -117,7 +117,6 @@
         this.freeTextItem = null;
         this.state = {};
         this.cachedPaths = [];
-        this.ddClicked = false;
 
         var input = this.input = buildElement("input", options.inputClass, { position: "absolute", display: "block", backgroundColor: "transparent", width: "100%" });
         input.type = "text";
@@ -191,14 +190,15 @@
 
         // Execute user-defined function for building items
         var itemFn = function(state, callback) { callback(); };
-        var path = nodeList.join();
-        if (currentItem.itemFn && this.cachedPaths.indexOf(path) < 0) {
+        var matchedText = this.input.value.substring(0, this.input.value.length - remainingText.length);
+        if (currentItem.itemFn && this.cachedPaths.indexOf(matchedText) < 0) {
             itemFn = currentItem.itemFn;
-            this.cachedPaths.push(path);
+            this.cachedPaths.push(matchedText);
         }
 
         itemFn({
-            "text": this.input.value.substring(remainingText.length),
+            "matchedText": matchedText,
+            "remainingText": remainingText,
             "item": currentItem,
             "list": nodeList
         }, function() {
@@ -316,8 +316,9 @@
 
             this.freeTextItem = freeTextItem;
             this.state = {
+                "matchedText": matchedText,
                 "remainingText": remainingText,
-                "template": currentItem,
+                "item": currentItem,
                 "list": nodeList,
                 "items": suggestItems,
                 "descriptions": descriptions
@@ -343,7 +344,6 @@
 
         function onDown(value) {
             return function() {
-                this.ddClicked = true;
                 this.setValue(this.input.value + value.substring(state.remainingText.length));
                 setTimeout(function() { this.input.focus(); }.bind(this), 0);
             }
@@ -362,8 +362,7 @@
 
             if (this.dropdown.children) {
                 this.dropdown.style.display = "block";
-                var validText = this.input.value.substring(0, this.input.value.length - state.remainingText.length);
-                var offset = Math.min(this.textWidth(validText), this.input.clientWidth - this.dropdown.clientWidth);
+                var offset = Math.min(this.textWidth(state.matchedText), this.input.clientWidth - this.dropdown.clientWidth);
                 this.dropdown.style.marginLeft = format("{0}px", offset);
             }
         }
@@ -451,12 +450,8 @@
 
     AutoSuggest.prototype.onBlur = function() {
         this.buildDropdown();
-        if (this.ddClicked) {
-            this.ddClicked = false;
-        } else {
-            this.hint.value = (this.input.value === "") ? this.options.watermark : "";
-            this.cachedPaths = [];
-        }
+        this.hint.value = (this.input.value === "") ? this.options.watermark : "";
+        this.cachedPaths = [];
     };
 
     AutoSuggest.prototype.onParse = function() {
