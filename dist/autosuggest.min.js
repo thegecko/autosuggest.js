@@ -1,7 +1,7 @@
 /* @license
  *
  * AutoSuggest.js
- * Version: 0.0.12
+ * Version: 0.0.13
  *
  * The MIT License (MIT)
  *
