@@ -1,7 +1,7 @@
 /* @license
  *
  * AutoSuggest.js
- * Version: 0.0.11
+ * Version: 0.0.12
  *
  * The MIT License (MIT)
  *
@@ -114,7 +114,7 @@
         this.template = template;
         this.references = template.references;
         this.callback = callback;
-        this.dropdownIndex = 0;
+        this.dropdownIndex = -1;
         this.freeTextItem = null;
         this.state = {};
         this.cachedPaths = [];
@@ -331,13 +331,13 @@
     };
 
     AutoSuggest.prototype.textWidth = function(text) {
-        this.ruler.innerText = text;
+        this.ruler.textContent = text;
         return this.ruler.offsetWidth;
     };
 
     AutoSuggest.prototype.buildDropdown = function(state) {
         this.dropdown.style.display = "none";
-        this.dropdownIndex = 0;
+        this.dropdownIndex = -1;
 
         while (this.dropdown.firstChild) {
             this.dropdown.removeChild(this.dropdown.firstChild);
@@ -356,12 +356,13 @@
                 // Ignore items not beginning with current text
                 if (state.remainingText && value.indexOf(state.remainingText) !== 0) continue;               
                 var option = buildElement("div", this.options.dropdownOptionClass);
-                option.innerText = state.descriptions[name];
+                option.textContent = state.descriptions[name];
                 option.addEventListener("mousedown", onDown(value).bind(this));
                 this.dropdown.appendChild(option);
             }
 
-            if (this.dropdown.children) {
+            if (this.dropdown.children && this.dropdown.children.length > 0) {
+                this.dropdownIndex = 0;
                 this.dropdown.style.display = "block";
                 var offset = Math.min(this.textWidth(state.matchedText), this.input.clientWidth - this.dropdown.clientWidth);
                 this.dropdown.style.marginLeft = format("{0}px", offset);
@@ -370,7 +371,7 @@
     };
 
     AutoSuggest.prototype.renderDropdown = function(offset) {
-        if (this.dropdown.children) {
+        if (this.dropdownIndex >= 0) {
             offset = offset || 0;
             this.dropdownIndex += offset
 
@@ -383,25 +384,34 @@
         }
     };
 
+    AutoSuggest.prototype.selectedValue = function(state) {
+        var index = 0;
+        for (var name in state.items) {
+            var value = state.items[name];
+            if (value.indexOf(state.remainingText) === 0 ) {
+                if (index == this.dropdownIndex) {
+                    return this.input.value + value.substring(state.remainingText.length);
+                } else {
+                    index ++;
+                }
+            }
+        }
+        return "";
+    };
+
     AutoSuggest.prototype.renderHint = function(state) {
+        // Hide hint when there's no space
+        if (this.input.scrollWidth > this.input.clientWidth) {
+            return;
+        }
+
         // Freetext items can have a placeholder when nothing entered
         if (this.freeTextItem && this.freeTextItem.placeHolder) {
             this.hint.value = this.input.value + this.freeTextItem.placeHolder;
             return;
         }
 
-        var index = 0;
-        for (var name in state.items) {
-            var value = state.items[name];
-            if (value.indexOf(state.remainingText) === 0 ) {
-                if (index == this.dropdownIndex) {
-                    this.hint.value = this.input.value + value.substring(state.remainingText.length);
-                    break;                    
-                } else {
-                    index ++;
-                }
-            }
-        }
+        this.hint.value = this.selectedValue(state);
     };
 
     AutoSuggest.prototype.onKeydown = function(e) {
@@ -414,8 +424,8 @@
             case 39: {      // Right
 
                 // Autocomplete the selected suggestion
-                if (this.input.selectionStart == this.input.value.length && this.input.selectionStart < this.hint.value.length) {
-                    this.setValue(this.hint.value);
+                if (this.input.selectionStart == this.input.value.length && this.dropdownIndex >= 0) {
+                    this.setValue(this.selectedValue(this.state));
                 }
 
                 if (keyCode === 9) {
@@ -470,7 +480,7 @@
             this.buildDropdown(this.state);
             this.renderDropdown();
             this.renderHint(this.state);
-            setTimeout(function() { this.hint.scrollLeft = this.input.scrollLeft; }.bind(this), 0);
+            this.input.scrollLeft = this.input.scrollWidth;
         }
     };
 
