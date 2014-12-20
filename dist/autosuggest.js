@@ -1,7 +1,7 @@
 /* @license
  *
  * AutoSuggest.js
- * Version: 0.0.13
+ * Version: 0.0.14
  *
  * The MIT License (MIT)
  *
@@ -92,7 +92,6 @@
             valueFormat: "{0}{1}",
             descriptionFormat: "{0} ({1})",
             freeTextMarker: "*",
-            referenceMarker: "$ref",
             parseOnFocus: false,
             inputClass: "input",
             hintClass: "input hint",
@@ -112,7 +111,6 @@
         }
 
         this.template = template;
-        this.references = template.references;
         this.callback = callback;
         this.dropdownIndex = -1;
         this.freeTextItem = null;
@@ -166,9 +164,13 @@
 
     // Mixin item with any referenced counterpart
     AutoSuggest.prototype.resolveReference = function(item) {
-        if (item[this.options.referenceMarker]) {
-            var referenceName = item[this.options.referenceMarker];
-            var reference = this.references[referenceName];
+        if (item["$ref"] && item["$ref"].indexOf("#") == 0) {
+            var jsonPointer = item["$ref"].split(/[#\/]+/).splice(1);
+            var reference = this.template;
+            for (var i in jsonPointer) {
+                reference = reference[jsonPointer[i]];
+                if (!reference) return;
+            }
             for (var name in reference) {
                 if (item[name] === undefined) {
                     item[name] = reference[name];
