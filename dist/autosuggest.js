@@ -164,8 +164,8 @@
 
     // Mixin item with any referenced counterpart
     AutoSuggest.prototype.resolveReference = function(item) {
-        if (item["$ref"] && item["$ref"].indexOf("#") == 0) {
-            var jsonPointer = item["$ref"].split(/[#\/]+/).splice(1);
+        if (item.$ref && item.$ref.indexOf("#") === 0) {
+            var jsonPointer = item.$ref.split(/[#\/]+/).splice(1);
             var reference = this.template;
             for (var i in jsonPointer) {
                 reference = reference[jsonPointer[i]];
@@ -222,7 +222,7 @@
             }
 
             // Build dictionary of values
-            var suggestItems = {}
+            var suggestItems = {};
             for (var name in items) {
                 var item = items[name];
 
@@ -257,7 +257,7 @@
                     length = remainingText.length;
 
                     // Find the longest exact match starting from the end
-                    for (var name in suggestItems) {
+                    for (name in suggestItems) {
                         var value = suggestItems[name];
                         var index = remainingText.indexOf(value);
                         if (index > -1 && index < length) {
@@ -267,11 +267,11 @@
 
                     // If length is unchanged, find longest partial match from the end
                     if (length === remainingText.length) {
-                        for (var name in suggestItems) {
-                            var value = suggestItems[name];
+                        for (name in suggestItems) {
+                            value = suggestItems[name];
                             for (var i = 1; i <= value.length; i++) {
                                 var partial = value.substring(0, i);
-                                var index = remainingText.length - i;
+                                index = remainingText.length - i;
                                 if (remainingText.substring(index) === partial && index < length){
                                     length = index;
                                 }
@@ -281,8 +281,8 @@
                 } else {
 
                     // Find the longest exact match
-                    for (var name in suggestItems) {
-                        var value = suggestItems[name];
+                    for (name in suggestItems) {
+                        value = suggestItems[name];
                         if (remainingText.indexOf(value) === 0 && value.length > length) {
                             // We have found a matching item longer than before
                             matchName = name;
@@ -310,9 +310,9 @@
 
             // Build current state
             var descriptions = {};
-            for (var name in suggestItems) {
-                var value = suggestItems[name];
-                var item = items[name];
+            for (name in suggestItems) {
+                value = suggestItems[name];
+                item = items[name];
                 var description = item.description ? format(this.options.descriptionFormat, value, item.description) : value;
                 descriptions[name] = description;
             }       
@@ -349,7 +349,7 @@
             return function() {
                 this.setValue(this.input.value + value.substring(state.remainingText.length));
                 setTimeout(function() { this.input.focus(); }.bind(this), 0);
-            }
+            };
         }
 
         if (state) {
@@ -375,7 +375,7 @@
     AutoSuggest.prototype.renderDropdown = function(offset) {
         if (this.dropdownIndex >= 0) {
             offset = offset || 0;
-            this.dropdownIndex += offset
+            this.dropdownIndex += offset;
 
             if (this.dropdownIndex >= this.dropdown.children.length) this.dropdownIndex = 0;
             if (this.dropdownIndex < 0) this.dropdownIndex = this.dropdown.children.length - 1;
