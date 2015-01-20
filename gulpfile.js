@@ -1,6 +1,7 @@
 var gulp = require('gulp');
 var uglify = require('gulp-uglifyjs');
 var jshint = require('gulp-jshint');
+var browserSync = require('browser-sync');
 
 gulp.task('uglify', function() {
     return gulp.src('dist/autosuggest.js')
@@ -18,4 +19,19 @@ gulp.task('lint', function() {
         .pipe(jshint.reporter('default'));
 });
 
+gulp.task('browser-sync', function() {
+    browserSync({
+        port: 1234,
+        server: {
+            baseDir: "./",
+            index: "index.html"
+        }
+    });
+});
+
 gulp.task('default', ['uglify', 'lint']);
+
+gulp.task('debug', ['browser-sync'], function () {
+    gulp.watch(["dist/autosuggest.js"], ['uglify', 'lint']);
+    gulp.watch(["**"], browserSync.reload);
+});
