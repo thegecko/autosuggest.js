@@ -18,6 +18,7 @@
   ],
   "ignore": [
     ".gitignore",
+    ".jshintrc",
     "gulpfile.js",
     "package.json"
   ]
