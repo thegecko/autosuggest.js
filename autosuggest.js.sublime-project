@@ -1,0 +1,22 @@
+{
+    "folders":
+    [
+        {
+            "path": "./"
+        }
+    ],
+    "build_systems": [
+        {
+            "name": "build",
+            "cmd": ["gulp"],
+            "working_dir": "$project_path",
+            "path": "/usr/local/bin:/usr/local/sbin:$PATH"
+        },
+        {
+            "name": "debug",
+            "cmd": ["npm", "run", "debug"],
+            "working_dir": "$project_path",
+            "path": "/usr/local/bin:/usr/local/sbin:$PATH"
+        }
+    ]
+}
