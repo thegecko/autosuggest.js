@@ -1,7 +1,7 @@
 /* @license
  *
  * AutoSuggest.js
- * Version: 0.0.14
+ * Version: 0.0.15
  *
  * The MIT License (MIT)
  *
@@ -25,6 +25,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
 (function(global, factory) {
 
     if (typeof exports === 'object') {
@@ -93,6 +94,7 @@
             descriptionFormat: "{0} ({1})",
             freeTextMarker: "*",
             parseOnFocus: false,
+            paddingRight: 40,
             inputClass: "input",
             hintClass: "input hint",
             containerClass: "suggest",
@@ -339,6 +341,7 @@
 
     AutoSuggest.prototype.buildDropdown = function(state) {
         this.dropdown.style.display = "none";
+        this.dropdown.style.marginLeft = 0;
         this.dropdownIndex = -1;
 
         while (this.dropdown.firstChild) {
@@ -366,7 +369,8 @@
             if (this.dropdown.children && this.dropdown.children.length > 0) {
                 this.dropdownIndex = 0;
                 this.dropdown.style.display = "block";
-                var offset = Math.min(this.textWidth(state.matchedText), this.input.clientWidth - this.dropdown.clientWidth);
+                var width = this.textWidth(state.matchedText) - this.input.scrollLeft;
+                var offset = Math.min(width, this.input.clientWidth - this.dropdown.clientWidth);
                 this.dropdown.style.marginLeft = format("{0}px", offset);
             }
         }
@@ -392,7 +396,7 @@
             var value = state.items[name];
             if (value.indexOf(state.remainingText) === 0 ) {
                 if (index == this.dropdownIndex) {
-                    return this.input.value + value.substring(state.remainingText.length);
+                    return value.substring(state.remainingText.length);
                 } else {
                     index ++;
                 }
@@ -402,14 +406,13 @@
     };
 
     AutoSuggest.prototype.renderHint = function(state) {
-        // Hide hint when there's no space
-        if (this.input.scrollWidth > this.input.clientWidth) {
-            return;
-        }
+        var width = this.textWidth(this.input.value) + parseInt(getComputedStyle(this.input, null).getPropertyValue('padding-left'));
+        var offset = Math.min(width, this.hint.clientWidth - this.options.paddingRight);
+        this.hint.style.paddingLeft = format("{0}px", offset);
 
         // Freetext items can have a placeholder when nothing entered
         if (this.freeTextItem && this.freeTextItem.placeHolder) {
-            this.hint.value = this.input.value + this.freeTextItem.placeHolder;
+            this.hint.value = this.freeTextItem.placeHolder;
             return;
         }
 
@@ -427,7 +430,7 @@
 
                 // Autocomplete the selected suggestion
                 if (this.input.selectionStart == this.input.value.length && this.dropdownIndex >= 0) {
-                    this.setValue(this.selectedValue(this.state));
+                    this.setValue(this.input.value + this.selectedValue(this.state));
                 }
 
                 if (keyCode === 9) {
@@ -458,6 +461,7 @@
     };
 
     AutoSuggest.prototype.onFocus = function() {
+        this.input.style.paddingRight = format("{0}px", this.options.paddingRight);
         if (this.options.parseOnFocus) {
             this.onInput();
         } else {
@@ -466,6 +470,7 @@
     };
 
     AutoSuggest.prototype.onBlur = function() {
+        this.input.style.paddingRight = "";
         this.buildDropdown();
         this.hint.value = (this.input.value === "") ? this.options.watermark : "";
         this.cachedPaths = [];
