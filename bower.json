@@ -1,11 +1,12 @@
 {
   "name": "autosuggest.js",
-  "version": "0.0.16",
   "description": "JavaScript library for suggesting and completing text",
-  "license": "MIT",
-  "authors": "Rob Moran <rob@thegecko.org>",
-  "main": "dist/autosuggest.js",
   "homepage": "https://github.com/thegecko/autosuggest.js",
+  "license": "MIT",
+  "main": "dist/autosuggest.js",
+  "authors": [
+    "Rob Moran <rob@thegecko.org>"
+  ],
   "repository": {
     "type": "git",
     "url": "git://github.com/thegecko/autosuggest.js.git"

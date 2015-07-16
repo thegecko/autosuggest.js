@@ -1,7 +1,7 @@
 /* @license
  *
  * AutoSuggest.js
- * Version: 0.0.16
+ * Version: 0.0.17
  *
  * The MIT License (MIT)
  *
@@ -135,8 +135,11 @@
         var loader = this.loader = buildElement("div", options.loaderClass, { position: "absolute", right: "0", visibility: "hidden" });
 
         if (options.prefill) {
-            for (var name in template.items) break;
-            input.value = this.itemValue(template.items[name], name);
+            if (typeof options.prefill === "string") input.value = options.prefill;
+            else {
+                for (var name in template.items) break;
+                input.value = this.itemValue(template.items[name], name);
+            }
         } else {
             hint.value = options.watermark;
         }
